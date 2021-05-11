@@ -57,15 +57,26 @@ int command(char input[], char previousInput[], int hasPreviousCmd) {
 
 int main(int argc, char *argv[]) {
 
-    printf("Starting IC shell\n");
+    char input[1000];
     char previousLine[1000];
     int hasPreviousCmd = 0;
 
-    while(1) {
-            char input[1000];
+    if(argc<2) {
+        printf("Starting IC shell\n");
+        while(1) {
             printf("icsh $ ");
             fgets(input, sizeof(input), stdin);
             hasPreviousCmd = command(input, previousLine, hasPreviousCmd);
+        }
+    }
+    else {
+        FILE* fp;
+        for (int i=1; i<argc; i++) {
+            fp = fopen(argv[i], "r");
+            while(fgets(input, 1000, fp)) {
+                hasPreviousCmd = command(input, previousLine, hasPreviousCmd);
+            }
+        }
     }
     return 0;
 }
