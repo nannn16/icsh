@@ -57,10 +57,13 @@ void commandHelper(char input[]) {
 
     // if the command is exit
     else if (strcmp(ptr[0], "exit") == 0) {
-        printf("bye\n");
-        int status = atoi(ptr[1]);
-        status = status & 0xFF;
-        exit(status);
+	if(ptr[1]!=NULL) {
+		printf("bye\n");
+        	int status = atoi(ptr[1]);
+        	status = status & 0xFF;
+        	exit(status);
+	}
+	printf("no exit code\n");
     }
 
     // else, run the external command.
