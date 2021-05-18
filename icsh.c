@@ -3,6 +3,10 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <sys/wait.h>
+#include <signal.h>
+#include "sig.h"
+
+int exitCode = 0;
 
 /*  
     put words in array of input into array of pointer ptr
@@ -22,17 +26,37 @@ void makeDoublePointer(char *ptr[], char input[]) {
     create process / execute a program / wait for it to complete.
 */
 void forkExec(char **input) {
+
     pid_t pid = fork();
+
     if (pid < 0) printf("fork() failed\n");
+    // child process
     else if (pid == 0) {
-        // child process
-        execvp(input[0], input); // run the external command.
+        
+        // restore default sigaction
+        struct sigaction action;
+        action.sa_handler = SIG_DFL;
+        sigemptyset(&action.sa_mask);
+        action.sa_flags = 0;
+
+        sigaction(SIGINT, &action, NULL);
+
+        // run the external command.
+        execvp(input[0], input);
         printf("bad command\n");
         exit(0);
     }
     else {
         int status;
-        pid_t pid = wait(&status); // wait for a child process to finish.
+        waitpid(pid, &status, WUNTRACED); // wait for a child process to stop.
+    
+        if (WIFEXITED(status)) {
+            exitCode = WEXITSTATUS(status);
+        }
+        // print new line if the child process terminate abnormally
+        else {
+            printf("\n");
+        }
     }
 }
 
@@ -47,23 +71,29 @@ void commandHelper(char input[]) {
 
     // if the command is echo
     if(strcmp(ptr[0], "echo") == 0) {
-        int i = 1;
-        while(ptr[i]!=NULL) {
-            printf("%s ", ptr[i]);
-            i++;
+        if(strcmp(ptr[1], "$?")==0 && ptr[2]==NULL) {
+            printf("%d\n", exitCode);
         }
-        printf("\n");
+        else {
+            int i = 1;
+            while(ptr[i]!=NULL) {
+                printf("%s ", ptr[i]);
+                i++;
+            }
+            printf("\n");
+            exitCode = 0;
+        }
     }
 
     // if the command is exit
     else if (strcmp(ptr[0], "exit") == 0) {
-	if(ptr[1]!=NULL) {
-		printf("bye\n");
+        if(ptr[1]!=NULL) {
+		    printf("bye\n");
         	int status = atoi(ptr[1]);
         	status = status & 0xFF;
         	exit(status);
-	}
-	printf("no exit code\n");
+	    }
+	    printf("no exit code\n");
     }
 
     // else, run the external command.
@@ -102,6 +132,9 @@ int main(int argc, char *argv[]) {
     char input[1000];
     char previousLine[1000];
     int hasPreviousCmd = 0;
+
+    // set the signal handlers in sig.c
+    enableSignalHandlers();
 
     if(argc<2) { // when there is no file input, take user input.
         printf("Starting IC shell\n");
