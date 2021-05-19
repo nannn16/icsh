@@ -1,1 +1,2 @@
+void enableDefaultHandlers();
 void enableSignalHandlers();

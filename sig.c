@@ -13,10 +13,27 @@ void child_handler(int signum) {
         ;
 }
 
-void sigtstp_handler(int signum) { printf("\nsuspensed"); }
+void enableDefaultHandlers() {
+
+    // restore default sigaction
+    struct sigaction action;
+    action.sa_handler = SIG_DFL;
+    sigemptyset(&action.sa_mask);
+    action.sa_flags = 0;
+
+    sigaction(SIGINT, &action, NULL);
+
+    struct sigaction sigtstp;
+    sigtstp.sa_handler = SIG_DFL;
+    sigemptyset(&sigtstp.sa_mask);
+    sigtstp.sa_flags = 0;
+
+    sigaction(SIGTSTP, &sigtstp, NULL);
+}
 
 void enableSignalHandlers() {
 
+    // Install sig_child handler
     struct sigaction sa;
     sigemptyset(&sa.sa_mask);
     sa.sa_flags = 0;
@@ -24,7 +41,7 @@ void enableSignalHandlers() {
 
     sigaction(SIGCHLD, &sa, NULL);
 
-    // ignore SIGINT in parent process.
+    // Control-C. ignore SIGINT in parent process.
     struct sigaction sigint1, sigint2;
     sigint1.sa_handler = SIG_IGN;
     sigemptyset(&sigint1.sa_mask);
@@ -34,9 +51,9 @@ void enableSignalHandlers() {
     if (sigint2.sa_handler != SIG_IGN)
         sigaction(SIGINT, &sigint1, NULL);
 
-    // Install SIGTSTP handler
+    // Control-Z. ignore SIGTSTP in parent process.
     struct sigaction sigtstp;
-    sigtstp.sa_handler = sigtstp_handler;
+    sigtstp.sa_handler = SIG_IGN;
     sigemptyset(&sigtstp.sa_mask);
     sigtstp.sa_flags = 0;
 

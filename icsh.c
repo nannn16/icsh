@@ -34,12 +34,7 @@ void forkExec(char **input) {
     else if (pid == 0) {
         
         // restore default sigaction
-        struct sigaction action;
-        action.sa_handler = SIG_DFL;
-        sigemptyset(&action.sa_mask);
-        action.sa_flags = 0;
-
-        sigaction(SIGINT, &action, NULL);
+        enableDefaultHandlers();
 
         // run the external command.
         execvp(input[0], input);
