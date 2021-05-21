@@ -36,14 +36,21 @@ void forkExec(char **input) {
         // restore default sigaction
         enableDefaultHandlers();
 
+        pid = getpid();
+        setpgid(pid, pid);
+        tcsetpgrp(0, pid);
         // run the external command.
         execvp(input[0], input);
         printf("bad command\n");
         exit(0);
     }
     else {
+
+        setpgid(pid, pid);
+        tcsetpgrp(0, pid);
         int status;
         waitpid(pid, &status, WUNTRACED); // wait for a child process to stop.
+        tcsetpgrp(0, getpid());
     
         if (WIFEXITED(status)) {
             exitCode = WEXITSTATUS(status);
