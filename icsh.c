@@ -52,12 +52,17 @@ void forkExec(char **input) {
         waitpid(pid, &status, WUNTRACED); // wait for a child process to stop.
         tcsetpgrp(0, getpid());
     
-        if (WIFEXITED(status)) {
+        if (WIFEXITED(status)) { 
             exitCode = WEXITSTATUS(status);
         }
         // print new line if the child process terminate abnormally
-        else {
-            printf("\n");
+        else { printf("\n"); }
+        
+        if(WIFSIGNALED(status)) {
+            exitCode = 128 + WTERMSIG(status);
+        }
+        if(WIFSTOPPED(status)) {
+            exitCode = 128 + WSTOPSIG(status);
         }
     }
 }
@@ -127,6 +132,10 @@ int command(char input[], char previousInput[], int hasPreviousCmd) {
         commandHelper(line);
     }
     return hasPreviousCmd;
+}
+
+int dup2(int fildes, int fildes2) {
+    return 0;
 }
 
 int main(int argc, char *argv[]) {
