@@ -4,9 +4,47 @@
 #include <unistd.h>
 #include <sys/wait.h>
 #include <signal.h>
+#include <errno.h>
+#include <sys/types.h>
+#include <fcntl.h>
 #include "sig.h"
 
+/* 
+Reference: 
+sigchld.c, sig_block.c
+https://stackoverflow.com/questions/15472299/split-string-into-tokens-and-save-them-in-an-array
+https://stackoverflow.com/questions/32708086/ignoring-signals-in-parent-process
+https://stackoverflow.com/questions/6335730/zombie-process-cant-be-killed
+https://stackoverflow.com/questions/11515399/implementing-shell-in-c-and-need-help-handling-input-output-redirection
+*/
+
 int exitCode = 0;
+int isIn;
+int isOut;
+
+int dup2(int fildes, int fildes2);
+
+void ioRedirection(char *file) {
+
+    if (isIn) {
+        isIn = 0;
+        int in;
+        in = open (file, O_RDONLY);
+        if (in <= 0) {
+            fprintf (stderr, "Couldn't open a file\n");
+            exit (errno);
+        }
+        dup2 (in, 0);
+        close (in);
+    }
+    else if (isOut) {
+        isOut = 0;
+        int out;
+        out = open (file, O_TRUNC | O_CREAT | O_WRONLY, 0666);
+        dup2 (out, 1);
+        close (out);
+    }
+}
 
 /*  
     put words in array of input into array of pointer ptr
@@ -25,16 +63,18 @@ void makeDoublePointer(char *ptr[], char input[]) {
 /*
     create process / execute a program / wait for it to complete.
 */
-void forkExec(char **input) {
+void forkExec(char **input, char *file) {
 
     pid_t pid = fork();
 
     if (pid < 0) printf("fork() failed\n");
     // child process
     else if (pid == 0) {
-        
+
         // restore default sigaction
         enableDefaultHandlers();
+
+        ioRedirection(file);
 
         pid = getpid();
         setpgid(pid, pid);
@@ -45,7 +85,6 @@ void forkExec(char **input) {
         exit(0);
     }
     else {
-
         setpgid(pid, pid);
         tcsetpgrp(0, pid);
         int status;
@@ -70,7 +109,25 @@ void forkExec(char **input) {
 /*
     run the input command.
 */
-void commandHelper(char input[]) {
+void commandHelper(char line[]) {
+
+    isIn = 0;
+    isOut = 0;
+
+    if(strchr(line, '<')!=NULL) {
+        isIn = 1;
+    }
+    else if (strchr(line, '>')!=NULL) {
+        isOut = 1;
+    }
+
+    // separate the command and the file name.
+    char *token;
+    token = strtok(line, "<>");
+    char *input = token;
+
+    token = strtok(NULL, " \n");
+    char *file = token;
 
     // initialize ptr and put words in input into ptr.
     char *ptr[50] = {0};
@@ -78,6 +135,7 @@ void commandHelper(char input[]) {
 
     // if the command is echo
     if(strcmp(ptr[0], "echo") == 0) {
+        ioRedirection(file);
         if(strcmp(ptr[1], "$?")==0 && ptr[2]==NULL) {
             printf("%d\n", exitCode);
         }
@@ -105,7 +163,7 @@ void commandHelper(char input[]) {
 
     // else, run the external command.
     else { 
-        forkExec(ptr);
+        forkExec(ptr, file);
     }
 }
 
@@ -132,10 +190,6 @@ int command(char input[], char previousInput[], int hasPreviousCmd) {
         commandHelper(line);
     }
     return hasPreviousCmd;
-}
-
-int dup2(int fildes, int fildes2) {
-    return 0;
 }
 
 int main(int argc, char *argv[]) {
