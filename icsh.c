@@ -30,7 +30,6 @@ pid_t fgpid;
 pid_t curbgpid; /* + flag in job control */
 pid_t prevbgpid; /* - flag in job control */
 int fgrun; /* is foreground job still running? */
-int queue = 1;
 struct job bg_jobs[MAXJOBS];
 struct job foreground;
 
@@ -115,11 +114,19 @@ void printJobsList() {
     }
 }
 
+int findFreeJobID() {
+    for(int i=1; i<MAXJOBS; i++) {
+        if(bg_jobs[i].job_id==0) {
+            return i;
+        }
+    }
+    return 0;
+}
+
 void fg(int job_id) {
     pid_t pid = bg_jobs[job_id].pid;
     printf("%s\n", bg_jobs[job_id].command);
     deleteBgJob(pid, job_id);
-    queue--;
 
     tcsetpgrp(0, pid);
     kill(pid, SIGCONT);
@@ -141,6 +148,15 @@ void bg(int job_id) {
     printf("[%d]%s%s\t%s &\n", bg.job_id, isCur ? "+" : "" , isPrev ? "-" : "" , bg.command);
     kill(pid, SIGCONT);
     sleep(0); /* wait a little bit before return to prompt */
+}
+
+int findCurJobId() {
+    for(int i = 1; i<MAXJOBS; i++) {
+        if (bg_jobs[i].pid == curbgpid) {
+            return bg_jobs[i].job_id;
+        }
+    }
+    return 0;
 }
 
 /*
@@ -171,10 +187,9 @@ void forkExec(char **input, char *file, int background, char *cmd) {
     }
     else {
         setpgid(pid, pid);
-        int jobID = queue;
+        int jobID = findFreeJobID();
         if(background) {
             addBgJob(pid, jobID, cmd, "Running");
-            queue++;
             pid_t temp = curbgpid;
             curbgpid = pid;
             prevbgpid = temp;
@@ -182,7 +197,7 @@ void forkExec(char **input, char *file, int background, char *cmd) {
             printf("[%d] %d\n", jobID, pid);
         }
         else {
-            updateFg(foreground, pid, queue, cmd, "foreground");
+            updateFg(foreground, pid, jobID, cmd, "foreground");
             sigprocmask(SIG_UNBLOCK, &mask,NULL);
             tcsetpgrp(0, pid);
             fgpid = pid;
@@ -280,8 +295,14 @@ void commandHelper(char line[]) {
                 fg(job_id);
             }
         }
-        else {
-            printf("fg: no current job\n");
+        else if (ptr[1]==NULL) {
+            int job_id = findCurJobId();
+            if(job_id!=0) {
+                fg(job_id);
+            }
+            else {
+                printf("fg: no current job\n");
+            }
         }
     }
     else if (strcmp(ptr[0], "bg")==0) {
@@ -295,8 +316,14 @@ void commandHelper(char line[]) {
                 bg(job_id);
             }
         }
-        else {
-            printf("fg: no current job\n");
+        else if (ptr[1]== NULL){
+            int job_id = findCurJobId();
+            if(job_id!=0) {
+                bg(job_id);
+            }
+            else {
+                printf("bg: no current job\n");
+            }
         }
     }
     /* else, run the external command. */

@@ -21,3 +21,4 @@ void printCmd();
 void printJobDone(pid_t pid);
 void addBgJob(pid_t pid, int job_id, char *cmd, char *state);
 void deleteBgJob(pid_t pid, int job_id);
+int findFreeJobID();

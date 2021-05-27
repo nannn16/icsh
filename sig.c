@@ -10,7 +10,6 @@ pid_t fgpid;
 pid_t curbgpid;
 pid_t prevbgpid;
 int fgrun;
-int queue;
 struct job bg_jobs[MAXJOBS];
 struct job foreground;
 
@@ -37,14 +36,12 @@ void printJobDone(pid_t pid) {
             int isPrev = 0;
             if(bg_jobs[i].pid==curbgpid) isCur = 1;
             else if (bg_jobs[i].pid==prevbgpid) isPrev = 1;
-            queue--;
             printf("\n[%d]%s%s\tDone\t\t%s\n", bg_jobs[i].job_id, isCur ? "+" : "" , isPrev ? "-" : "" , bg_jobs[i].command);
             deleteBgJob(pid, bg_jobs[i].job_id);
         }
     }
 }
 
-/* */
 void child_handler (int signum) {
     pid_t pid;
     int status;
@@ -59,9 +56,9 @@ void child_handler (int signum) {
                 pid_t temp = curbgpid;
                 curbgpid = pid;
                 prevbgpid = temp;
-                printf("[%d]+\tStopped\t\t%s\n", queue, foreground.command);
-                addBgJob(pid, queue, foreground.command, "Stopped"); /* send suspensed process to background job */
-                queue++;
+                int jobID = findFreeJobID();
+                printf("[%d]+\tStopped\t\t%s\n", jobID, foreground.command);
+                addBgJob(pid, jobID, foreground.command, "Stopped"); /* send suspensed process to background job */
             }
             fgrun = 0; /* foreground job terminated */
         }
