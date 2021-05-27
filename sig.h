@@ -1,4 +1,4 @@
-#define MAXJOBS      20
+#define MAXJOBS      100
 
 typedef struct job {
     pid_t pid;
