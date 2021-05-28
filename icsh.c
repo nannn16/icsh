@@ -126,6 +126,7 @@ int findFreeJobID() {
 void fg(int job_id) {
     pid_t pid = bg_jobs[job_id].pid;
     printf("%s\n", bg_jobs[job_id].command);
+    updateFg(foreground, pid, job_id, bg_jobs[job_id].command, "foreground");
     deleteBgJob(pid, job_id);
 
     tcsetpgrp(0, pid);
