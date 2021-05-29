@@ -226,6 +226,17 @@ void printEcho(char **ptr) {
     }
 }
 
+void changeDir(char **ptr) {
+    if(ptr[1]==NULL || strcmp(ptr[1],"~")==0) {
+        chdir(getenv("HOME"));
+    }
+    else {
+        if(chdir(ptr[1])==-1) {
+            printf("cd: no such file or directory: %s\n", ptr[1]);
+        }
+    }
+}
+
 /* 
 check if there is I/O redirection and if it is background process
 return whether it is background process
@@ -326,6 +337,9 @@ void commandHelper(char line[]) {
                 printf("bg: no current job\n");
             }
         }
+    }
+    else if(strcmp(ptr[0], "cd")==0) {
+        changeDir(ptr);
     }
     /* else, run the external command. */
     else { 
