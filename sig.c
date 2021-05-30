@@ -63,6 +63,9 @@ void child_handler (int signum) {
                 strcpy(jobs[jobID].state, "Stopped"); /* send suspensed process to background job */
                 printf("[%d]+\t%s\t\t%s\n", jobID, jobs[jobID].state, jobs[jobID].command);
             }
+            if(WIFSIGNALED(status)) {
+                deleteJob(pid, fgjob_id);
+            }
             if(WIFEXITED(status)) {
                 deleteJob(pid, fgjob_id);
             }
