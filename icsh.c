@@ -27,11 +27,11 @@ int exitCode;
 int isIn;
 int isOut;
 pid_t fgpid;
+int fgjob_id;
 pid_t curbgpid; /* + flag in job control */
 pid_t prevbgpid; /* - flag in job control */
 int fgrun; /* is foreground job still running? */
-struct job bg_jobs[MAXJOBS];
-struct job foreground;
+struct job jobs[MAXJOBS];
 
 int dup2(int fildes, int fildes2);
 
@@ -71,35 +71,28 @@ void makeDoublePointer(char *ptr[], char input[]) {
     }
 }
 
-void updateFg(job fg, pid_t pid, int job_id, char *cmd, char *state) {
-    fg.pid = pid;
-    fg.job_id = job_id;
-    strcpy(fg.command, cmd);
-    strcpy(fg.state, state);
-}
-
-void addBgJob(pid_t pid, int job_id, char *cmd, char *state) {
+void addJob(pid_t pid, int job_id, char *cmd, char *state) {
     job process = { pid, job_id, NULL, NULL };
     process.command = malloc(1000*sizeof(char));
     process.state = malloc(10*sizeof(char));
     strcpy(process.command, cmd);
     strcpy(process.state, state);
-    bg_jobs[job_id] = process;
+    jobs[job_id] = process;
 }
 
-void deleteBgJob(pid_t pid, int job_id) {
-    if(bg_jobs[job_id].pid == pid) {
-        bg_jobs[job_id].pid = 0;
-        bg_jobs[job_id].job_id = 0;
-        free(bg_jobs[job_id].command);
-        free(bg_jobs[job_id].state);
+void deleteJob(pid_t pid, int job_id) {
+    if(jobs[job_id].pid == pid) {
+        jobs[job_id].pid = 0;
+        jobs[job_id].job_id = 0;
+        free(jobs[job_id].command);
+        free(jobs[job_id].state);
     }
 }
 
 void printJobsList() {
     for(int i=0; i<MAXJOBS; i++) {
-        if(bg_jobs[i].job_id>0) {
-            job bg = bg_jobs[i];
+        if(jobs[i].job_id>0) {
+            job bg = jobs[i];
             int isCur = 0;
             int isPrev = 0;
             if(bg.pid==curbgpid) isCur = 1;
@@ -116,7 +109,7 @@ void printJobsList() {
 
 int findFreeJobID() {
     for(int i=1; i<MAXJOBS; i++) {
-        if(bg_jobs[i].job_id==0) {
+        if(jobs[i].job_id==0) {
             return i;
         }
     }
@@ -124,10 +117,9 @@ int findFreeJobID() {
 }
 
 void fg(int job_id) {
-    pid_t pid = bg_jobs[job_id].pid;
-    printf("%s\n", bg_jobs[job_id].command);
-    updateFg(foreground, pid, job_id, bg_jobs[job_id].command, "foreground");
-    deleteBgJob(pid, job_id);
+    fgjob_id = job_id;
+    pid_t pid = jobs[job_id].pid;
+    printf("%s\n", jobs[job_id].command);
 
     tcsetpgrp(0, pid);
     kill(pid, SIGCONT);
@@ -139,13 +131,13 @@ void fg(int job_id) {
 }
 
 void bg(int job_id) {
-    strcpy(bg_jobs[job_id].state, "Running");
-    job bg = bg_jobs[job_id];
+    strcpy(jobs[job_id].state, "Running");
+    job bg = jobs[job_id];
     int isCur = 0;
     int isPrev = 0;
     if(bg.pid==curbgpid) isCur = 1;
     else if (bg.pid==prevbgpid) isPrev = 1;
-    pid_t pid = bg_jobs[job_id].pid;
+    pid_t pid = jobs[job_id].pid;
     printf("[%d]%s%s\t%s &\n", bg.job_id, isCur ? "+" : "" , isPrev ? "-" : "" , bg.command);
     kill(pid, SIGCONT);
     sleep(0); /* wait a little bit before return to prompt */
@@ -153,8 +145,8 @@ void bg(int job_id) {
 
 int findCurJobId() {
     for(int i = 1; i<MAXJOBS; i++) {
-        if (bg_jobs[i].pid == curbgpid) {
-            return bg_jobs[i].job_id;
+        if (jobs[i].pid == curbgpid) {
+            return jobs[i].job_id;
         }
     }
     return 0;
@@ -190,7 +182,7 @@ void forkExec(char **input, char *file, int background, char *cmd) {
         setpgid(pid, pid);
         int jobID = findFreeJobID();
         if(background) {
-            addBgJob(pid, jobID, cmd, "Running");
+            addJob(pid, jobID, cmd, "Running");
             pid_t temp = curbgpid;
             curbgpid = pid;
             prevbgpid = temp;
@@ -198,7 +190,8 @@ void forkExec(char **input, char *file, int background, char *cmd) {
             printf("[%d] %d\n", jobID, pid);
         }
         else {
-            updateFg(foreground, pid, jobID, cmd, "foreground");
+            fgjob_id = jobID;
+            addJob(pid, jobID, cmd, "Foreground");
             sigprocmask(SIG_UNBLOCK, &mask,NULL);
             tcsetpgrp(0, pid);
             fgpid = pid;
@@ -300,7 +293,7 @@ void commandHelper(char line[]) {
         if((ptr[1]!=NULL) && (strncmp(ptr[1], "%%", 1)==0)) {
             char *jobID = strtok(ptr[1], "%%");
             int job_id = atoi(jobID);
-            if(bg_jobs[job_id].job_id==0) { 
+            if(jobs[job_id].job_id==0) { 
                 printf("fg: %%%d: no such job\n", job_id);
             }
             else { 
@@ -321,7 +314,7 @@ void commandHelper(char line[]) {
         if((ptr[1]!=NULL) && (strncmp(ptr[1], "%%", 1)==0)) {
             char *jobID = strtok(ptr[1], "%%");
             int job_id = atoi(jobID);
-            if(bg_jobs[job_id].job_id==0) { 
+            if(jobs[job_id].job_id==0) { 
                 printf("bg: %%%d: no such job\n", job_id);
             }
             else { 
@@ -380,11 +373,6 @@ int main(int argc, char *argv[]) {
 
     /* set the signal handlers in sig.c */
     enableSignalHandlers();
-    foreground.pid = 0;
-    foreground.job_id = 0;
-    foreground.command = malloc(1000*sizeof(char));
-    foreground.state = malloc(10*sizeof(char));
-
 
     if(argc<2) { /* when there is no file input, take user input. */
         printf("Starting IC shell\n");
@@ -416,7 +404,5 @@ int main(int argc, char *argv[]) {
             fclose(fp);
         }
     }
-    free(foreground.command);
-    free(foreground.state);
     return 0;
 }

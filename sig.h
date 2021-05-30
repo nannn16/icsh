@@ -7,9 +7,9 @@ typedef struct job {
     char *state;
 } job;
 
-struct job bg_jobs[MAXJOBS];
-struct job foreground;
+struct job jobs[MAXJOBS];
 pid_t fgpid;
+int fgjob_id;
 pid_t curbgpid;
 pid_t prevbgpid;
 int fgrun;
@@ -19,6 +19,6 @@ void enableDefaultHandlers();
 void enableSignalHandlers();
 void printCmd();
 void printJobDone(pid_t pid);
-void addBgJob(pid_t pid, int job_id, char *cmd, char *state);
-void deleteBgJob(pid_t pid, int job_id);
+void addJob(pid_t pid, int job_id, char *cmd, char *state);
+void deleteJob(pid_t pid, int job_id);
 int findFreeJobID();

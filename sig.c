@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <unistd.h>
 #include <signal.h>
 #include <sys/wait.h>
@@ -7,11 +8,11 @@
 
 int exitCode;
 pid_t fgpid;
+int fgjob_id;
 pid_t curbgpid;
 pid_t prevbgpid;
 int fgrun;
-struct job bg_jobs[MAXJOBS];
-struct job foreground;
+struct job jobs[MAXJOBS];
 
 /* get exit code when the process fq11inished */
 void getExitStatus(int status) {
@@ -31,13 +32,13 @@ void getExitStatus(int status) {
 
 void printJobDone(pid_t pid) {
     for(int i = 1; i<MAXJOBS; i++) {
-        if (bg_jobs[i].pid == pid) {
+        if (jobs[i].pid == pid) {
             int isCur = 0;
             int isPrev = 0;
-            if(bg_jobs[i].pid==curbgpid) isCur = 1;
-            else if (bg_jobs[i].pid==prevbgpid) isPrev = 1;
-            printf("\n[%d]%s%s\tDone\t\t%s\n", bg_jobs[i].job_id, isCur ? "+" : "" , isPrev ? "-" : "" , bg_jobs[i].command);
-            deleteBgJob(pid, bg_jobs[i].job_id);
+            if(jobs[i].pid==curbgpid) isCur = 1;
+            else if (jobs[i].pid==prevbgpid) isPrev = 1;
+            printf("\n[%d]%s%s\tDone\t\t%s\n", jobs[i].job_id, isCur ? "+" : "" , isPrev ? "-" : "" , jobs[i].command);
+            deleteJob(pid, jobs[i].job_id);
         }
     }
 }
@@ -56,9 +57,12 @@ void child_handler (int signum) {
                 pid_t temp = curbgpid;
                 curbgpid = pid;
                 prevbgpid = temp;
-                int jobID = findFreeJobID();
-                printf("[%d]+\tStopped\t\t%s\n", jobID, foreground.command);
-                addBgJob(pid, jobID, foreground.command, "Stopped"); /* send suspensed process to background job */
+                int jobID = fgjob_id;
+                strcpy(jobs[jobID].state, "Stopped"); /* send suspensed process to background job */
+                printf("[%d]+\t%s\t\t%s\n", jobID, jobs[jobID].state, jobs[jobID].command);
+            }
+            if(WIFEXITED(status)) {
+                deleteJob(pid, fgjob_id);
             }
             fgrun = 0; /* foreground job terminated */
         }
