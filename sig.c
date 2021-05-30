@@ -54,9 +54,11 @@ void child_handler (int signum) {
         else {
             getExitStatus(status);
             if(WIFSTOPPED(status)) {
-                pid_t temp = curbgpid;
-                curbgpid = pid;
-                prevbgpid = temp;
+                if(pid!=curbgpid) {
+                    pid_t temp = curbgpid;
+                    curbgpid = pid;
+                    prevbgpid = temp;
+                }
                 int jobID = fgjob_id;
                 strcpy(jobs[jobID].state, "Stopped"); /* send suspensed process to background job */
                 printf("[%d]+\t%s\t\t%s\n", jobID, jobs[jobID].state, jobs[jobID].command);

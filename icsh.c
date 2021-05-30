@@ -183,9 +183,11 @@ void forkExec(char **input, char *file, int background, char *cmd) {
         int jobID = findFreeJobID();
         if(background) {
             addJob(pid, jobID, cmd, "Running");
-            pid_t temp = curbgpid;
-            curbgpid = pid;
-            prevbgpid = temp;
+            if(pid!=curbgpid) {
+                pid_t temp = curbgpid;
+                curbgpid = pid;
+                prevbgpid = temp;
+            }
             sigprocmask(SIG_UNBLOCK, &mask,NULL);
             printf("[%d] %d\n", jobID, pid);
         }
